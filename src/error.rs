@@ -14,6 +14,7 @@ error_chain!{
 
     foreign_links {
         Dbus(dbus::Error) #[cfg(all(unix, not(target_os = "macos")))] ;
+        // DbusArrayError(dbus::ArrayError) #[cfg(all(unix, not(target_os = "macos")))] ;
         MacNotificationSys(mac_notification_sys::error::Error) #[cfg(target_os = "macos")] ;
         Parse(num::ParseIntError);
     }

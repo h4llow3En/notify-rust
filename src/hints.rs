@@ -14,6 +14,10 @@ use super::NotificationUrgency;
 
 #[cfg(all(unix, not(target_os = "macos")))]
 use dbus::MessageItem;
+
+#[cfg(all(feature = "images", unix, not(target_os = "macos")))]
+use dbus::MessageItemArray;
+
 use miniver::Version;
 
 #[cfg(all(unix, not(target_os = "macos")))]
@@ -128,7 +132,7 @@ impl From<NotificationImage> for MessageItem {
                                  MessageItem::Bool(img.alpha),
                                  MessageItem::Int32(img.bits_per_sample),
                                  MessageItem::Int32(img.channels),
-                                 MessageItem::Array(bytes, "y".into())
+                                 MessageItem::Array(MessageItemArray::new(bytes, "ay".into()).unwrap()  )
                                 ])
     }
 }

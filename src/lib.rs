@@ -155,10 +155,9 @@ extern crate dbus;
 #[cfg(target_os = "macos")] extern crate mac_notification_sys;
 #[cfg(target_os = "macos")] pub use mac_notification_sys::{get_bundle_identifier_or_default, set_application};
 
-#[cfg(all(unix, not(target_os = "macos")))] use std::borrow::Cow;
-#[cfg(all(unix, not(target_os = "macos")))] use dbus::{Connection, BusType, MessageItem};
+#[cfg(all(unix, not(target_os = "macos")))] use dbus::{Connection, BusType, MessageItem, MessageItemArray};
 #[cfg(all(unix, not(target_os = "macos")))] mod util;
-#[cfg(all(unix, not(target_os = "macos")))] pub mod server;
+// #[cfg(all(unix, not(target_os = "macos")))] pub mod server;
 
 #[cfg(target_os = "macos")] mod macos;
 #[cfg(target_os = "macos")] pub use macos::*;
@@ -462,9 +461,7 @@ impl Notification {
             }
         }
 
-        let sig = Cow::Borrowed("{sv}"); // cast to TypeSig makes rust1.0 and rust1.1 panic
-
-        Ok(MessageItem::Array(vec![], sig))
+        Ok(MessageItem::Array(MessageItemArray::new(vec![], "a{sv}".into()).unwrap()))
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -478,8 +475,8 @@ impl Notification {
                 return array;
             }
         }
-        let sig = Cow::Borrowed("s"); // cast to TypeSig makes rust1.0 and rust1.1 panic
-        MessageItem::Array(vec![], sig)
+
+        MessageItem::Array(MessageItemArray::new(vec![], "as".into()).unwrap())
     }
 
     /// Sends Notification to D-Bus.

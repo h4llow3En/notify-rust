@@ -1,7 +1,6 @@
 //! This module contains XDG and DBus specific code.
 //!
 //! it should not be available under any platform other than `(unix, not(target_os = "macos"))`
-use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
 use super::Notification;
@@ -120,7 +119,7 @@ pub fn get_capabilities() -> Result<Vec<String>> {
     let connection = Connection::get_private(BusType::Session)?;
     let reply = connection.send_with_reply_and_block(message, 2000)?;
 
-    if let Some(&MessageItem::Array(ref items, Cow::Borrowed("s"))) = reply.get_items().get(0) {
+    if let Some(&MessageItem::Array(ref items)) = reply.get_items().get(0) {
         for item in items.iter() {
             if let MessageItem::Str(ref cap) = *item {
                 capabilities.push(cap.clone());
@@ -143,7 +142,8 @@ pub fn get_server_information() -> Result<ServerInformation> {
 
     let items = reply.get_items();
 
-    Ok(ServerInformation { name:         unwrap_message_string(items.get(0)),
+    Ok(ServerInformation {
+        name:         unwrap_message_string(items.get(0)),
         vendor:       unwrap_message_string(items.get(1)),
         version:      unwrap_message_string(items.get(2)),
         spec_version: unwrap_message_string(items.get(3)) })

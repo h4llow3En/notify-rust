@@ -6,14 +6,12 @@
 //! This server will not replace an already running notification server.
 //!
 
-use std::collections::HashSet;
 use std::cell::Cell;
 
-use dbus::{Connection, BusType, NameFlag, ConnectionItem, Message, MessageItem};
-use dbus::obj::{ObjectPath, Argument, Method, Interface};
+use dbus::{Connection, BusType, NameFlag};
+use dbus::tree::Factory;
 
-use super::{Notification, NotificationHint};
-use util::*;
+use super::Notification;
 
 static DBUS_ERROR_FAILED: &'static str = "org.freedesktop.DBus.Error.Failed";
 /// Version of the crate equals the version server.
@@ -50,125 +48,72 @@ impl NotificationServer {
     pub fn start<F>(&mut self, closure: F)
         where F: Fn(&Notification)
     {
-        let connection = Connection::get_private(BusType::Session).unwrap();
-        connection.release_name("org.freedesktop.Notifications").unwrap();
-        connection.register_name("org.freedesktop.Notifications", NameFlag::ReplaceExisting as u32).expect("Was not able to register name.");
-        let mut objpath = ObjectPath::new(&connection, "/org/freedesktop/Notifications", false);
-        connection.register_object_path( "/org/freedesktop/Notifications").expect("could not register object path");
 
-        let server_interface = Interface::new(
-            vec![
-                Method::new("Notify",
-                            vec![   Argument::new("app_name",    "s"),
-                                    Argument::new("replaces_id", "u"),
-                                    Argument::new("app_icon",    "s"),
-                                    Argument::new("summary",     "s"),
-                                    Argument::new("body",        "s"),
-                                    Argument::new("actions",    "as"),
-                                    Argument::new("hints",   "a{sv}"),
-                                    Argument::new("timeout",     "i")
-                            ],
+        // org.freedesktop.Notifications
+        // /org/freedesktop/Notifications
+        // Notify
+        //    app_name:    s
+        //    replaces_id: u
+        //    app_icon:    s
+        //    summary:     s
+        //    body:        s
+        //    actions:    as
+        //    hints:   a{sv}
+        //    timeout:     i
+        // Stop
+        // CloseNotification
+        //    id: u
+        // GetCapabilities
+        //    caps: {s}
+        // GetServerInformation
+        //
+    // Let's start by starting up a connection to the session bus and register a name.
+    let c = Connection::get_private(BusType::Session).unwrap();
+    c.register_name("org.freedesktop.Notifications", NameFlag::ReplaceExisting as u32).unwrap();
 
-                            vec![Argument::new("arg_0", "u")], //out_args
+    // The choice of factory tells us what type of tree we want,
+    // and if we want any extra data inside. We pick the simplest variant.
+    let f = Factory::new_fn::<()>();
 
-                            // Callback
-                            Box::new(|msg| {
+    // We create a tree with one object path inside and make that path introspectable.
+    let tree = f.tree(()).add(f.object_path("/org/freedesktop/Notifications", ()).introspectable().add(
 
-                                // TODO this must be prettier!
-                                let hint_items = msg.get_items().get(6).unwrap().clone();
-                                let hint_items:&Vec<MessageItem> = hint_items.inner().unwrap();
-                                let hints = hint_items.iter().map(|item|item.into()).collect::<HashSet<NotificationHint>>();
+        // We add an interface to the object path...
+        f.interface("org.freedesktop.Notifications", ()).add_m(
 
-                                let action_items = msg.get_items().get(5).unwrap().clone();
-                                let action_items:&Vec<MessageItem> = action_items.inner().unwrap();
-                                let actions:Vec<String> = action_items.iter().map(|action|action.inner::<&String>().unwrap().to_owned()).collect();
+            // ...and a method inside the interface.
+            f.method("Notify", (), move |m| {
 
-                                let notification = Notification{
-                                    appname: unwrap_message_str(msg.get_items().get(0).unwrap()),
-                                    summary: unwrap_message_string(msg.get_items().get(3)),
-                                    body:    unwrap_message_string(msg.get_items().get(4)),
-                                    icon:    unwrap_message_string(msg.get_items().get(2)),
-                                    timeout: msg.get_items().get(7).unwrap().inner().unwrap(),
-                                    subtitle: None,
-                                    hints:   hints,
-                                    actions: actions,
-                                    id: Some(self.counter.get())
-                                };
+                // This is the callback that will be called when another peer on the bus calls our method.
+                // the callback receives "MethodInfo" struct and can return either an error, or a list of
+                // messages to send back.
 
-                                closure(&notification); // send id and counter extra
+                let name: &str = m.msg.read1()?;
+                let s = format!("Hello {}!", name);
+                let mret = m.msg.method_return().append1(s);
 
-                                self.count_up();
-                                Ok(vec!(MessageItem::Int32(42)))
-                             })
-                ),
 
-                Method::new("CloseNotification",
-                            vec![Argument::new("id", "u")], //No input arguments
-                            vec![],
-                            //MessageItem::new_array( vec![ "body".into(), ]).unwrap()
-                            Box::new(|msg| {
-                                println!("{:?}", msg);
-                                Ok( vec![])}
-                                )
-                           ),
+                // Two messages will be returned - one is the method return (and should always be there),
+                // and in our case we also have a signal we want to send at the same time.
+                Ok(vec!(mret))
 
-                Method::new("Stop",
-                            vec![], //No input arguments
-                            vec![],
-                            //MessageItem::new_array( vec![ "body".into(), ]).unwrap()
-                            Box::new(|_msg| {
-                                self.stop.set(true);
-                                Ok( vec![])}
-                                )
-                           ),
+            // Our method has one output argument and one input argument.
+            }).outarg::<&str,_>("reply")
+            .inarg::<&str,_>("name")
 
-                Method::new("GetCapabilities",
-                             vec![], //No input arguments
-                             vec![Argument::new("caps", "{s}")],
-                             Box::new(|_msg| Ok( vec![
-                                     MessageItem::new_array( vec![ "body".into(), ]).unwrap()
-                             ]))
-                ),
+        // We also add the signal to the interface. This is mainly for introspection.
+        )
+    ));
 
-                Method::new("GetServerInformation",
-                            vec![], // No input arguments
-                            vec![
-                                Argument::new("name", "s"),
-                                Argument::new("vendor", "s"),
-                                Argument::new("version", "s"),
-                                Argument::new("spec_version", "s"),
-                            ],
-                            Box::new(|_msg| Ok( vec![
-                                        "notify-rust daemon".into(), "notify-rust".into(), VERSION.into(), "1.1".into()
-                            ]))
-                )
-            ],
+    // We register all object paths in the tree.
+    tree.set_registered(&c, true).unwrap();
 
-            vec![], // no properties
-            vec![]  // no signals
-        );
+    // We add the tree to the connection so that incoming method calls will be handled
+    // automatically during calls to "incoming".
+    c.add_handler(tree);
 
-        objpath.insert_interface("org.freedesktop.Notifications", server_interface);
-        //objpath.set_registered(true).unwrap();
+    // Serve other peers forever.
+    loop { c.incoming(1000).next(); }
 
-        for n in connection.iter(10) {
-            match n {
-                ConnectionItem::MethodCall(mut m) => {
-                    if objpath.handle_message(&mut m).is_none() {
-                        connection.send(Message::new_error(&m,
-                                                     DBUS_ERROR_FAILED,
-                                                     "Object path not found")
-                                .unwrap())
-                            .unwrap();
-                    }
-                }
-                ConnectionItem::Signal(_m) => { /*println!("Signal: {:?}", _m);*/ }
-                _ => (),
-            }
-            if self.stop.get() {
-                println!("stopping server");
-                break;
-            }
-        }
     }
 }

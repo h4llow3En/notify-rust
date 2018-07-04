@@ -2,8 +2,8 @@
 //!
 //! Many of these are standardized by either:
 //!
-//! * http://www.galago-project.org/specs/notification/0.9/x344.html
-//! * https://developer.gnome.org/notification-spec/#hints
+//!   * http://www.galago-project.org/specs/notification/0.9/x344.html
+//!   * https://developer.gnome.org/notification-spec/#hints
 //!
 //! Which of these are actually implemented depends strongly on the Notification server you talk to.
 //! Usually the `get_capabilities()` gives some clues, but the standards usually mention much more
@@ -131,7 +131,8 @@ impl From<NotificationImage> for MessageItem {
                                 ])
     }
 }
-/// All currently implemented `NotificationHints` that can be send.
+
+/// All currently implemented `NotificationHints` that can be sent.
 ///
 /// as found on https://developer.gnome.org/notification-spec/
 #[derive(Eq, PartialEq, Hash, Clone, Debug)]

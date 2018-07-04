@@ -4,7 +4,7 @@
 use std::borrow::Cow;
 use std::ops::{Deref, DerefMut};
 
-use dbus::{Connection, ConnectionItem, BusType, Message, MessageItem};
+use dbus::{Connection, ConnectionItem, BusType, Message, MessageItem, MessageItemArray};
 use super::Notification;
 use error::*;
 
@@ -119,10 +119,12 @@ pub fn get_capabilities() -> Result<Vec<String>> {
     let connection = try!(Connection::get_private(BusType::Session));
     let reply      = try!(connection.send_with_reply_and_block(message, 2000));
 
-    if let Some(&MessageItem::Array(ref items, Cow::Borrowed("s"))) = reply.get_items().get(0) {
-        for item in items.iter() {
-            if let MessageItem::Str(ref cap) = *item {
-                capabilities.push(cap.clone());
+    if let Some(&MessageItem::Array(array)) = reply.get_items().get(0) {
+        if let items = array.into_vec() {
+            for item in items.iter() {
+                if let MessageItem::Str(ref cap) = *item {
+                    capabilities.push(cap.clone());
+                }
             }
         }
     }

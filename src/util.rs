@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use dbus::MessageItem;
+use dbus::{MessageItem, MessageItemArray, Signature};
 
 //TODO get rid of the util functions
 
@@ -30,11 +30,13 @@ pub fn unwrap_message_str(item: &MessageItem) -> String {
 }
 
 pub fn unwrap_message_string(item: Option<&MessageItem>) -> String {
+    let sig_sv = Signature::new("{sv}").unwrap();
+    let sig_s = Signature::new("s").unwrap();
     match item {
         Some(&MessageItem::Str(ref value)) => value.clone(),
-        Some(&MessageItem::Array(ref items, Cow::Borrowed("{sv}"))) => format!("DICT   {:?}", items),
-        Some(&MessageItem::Array(ref items, Cow::Borrowed("s"))) => format!("ARRAY  {:?}", items),
-        Some(&MessageItem::Array(ref items, ref sig )) => format!("{sig:?} {items:?}", items=items, sig=sig),
+        Some(&MessageItem::Array(MessageItemArray{v: items, sig: sig_sv})) => format!("DICT   {:?}", items),
+        Some(&MessageItem::Array(MessageItemArray{v: items, sig})) => format!("ARRAY  {:?}", items),
+        Some(&MessageItem::Array(MessageItemArray{v: items, sig})) => format!("{sig:?} {items:?}", items=items, sig=sig),
         _ => "".to_owned()
     }
 }

@@ -1,4 +1,5 @@
 use error::*;
+use std::result;
 use std::str::FromStr;
 
 #[derive(Copy, Clone, Eq, Debug)]
@@ -13,15 +14,17 @@ impl Version {
     }
 }
 
+
 impl FromStr for Version {
     type Err = Error;
-
-    fn from_str(s: &str) -> Result<Version> {
+    fn from_str(s: &str) -> result::Result<Version, Error> {
         let vv = s.split('.').collect::<Vec<&str>>();
         match (vv.get(0), vv.get(1)) {
-            (Some(maj), Some(min)) => Ok(Version { major: maj.parse()?,
-                minor: min.parse()? }),
-            _ => bail!(ErrorKind::SpecVersion(s.into()))
+            (Some(maj), Some(min)) => Ok(Version {
+                major: maj.parse()?,
+                 minor: min.parse()?
+                  }),
+            _ => return Err(Error::SpecVersion(s.into()))
         }
     }
 }

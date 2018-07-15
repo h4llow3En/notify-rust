@@ -1,27 +1,31 @@
 #![allow(missing_docs)]
 #[cfg(all(unix, not(target_os = "macos")))]
 use dbus;
-
-#[cfg(target_os = "macos")]
-use mac_notification_sys;
+use failure;
 
 use std::num;
 
-error_chain!{
-    types {
-        Error, ErrorKind, ResultExt, Result;
-    }
+pub type Result<T> = ::std::result::Result<T, failure::Error>;
 
-    foreign_links {
-        Dbus(dbus::Error) #[cfg(all(unix, not(target_os = "macos")))] ;
-        MacNotificationSys(mac_notification_sys::error::Error) #[cfg(target_os = "macos")] ;
-        Parse(num::ParseIntError);
-    }
+#[derive(Fail, Debug)]
+pub enum Error {
+    #[fail(display="")]
+    #[cfg(all(unix, not(target_os = "macos")))]
+    Dbus(dbus::Error),
 
-    errors {
-        SpecVersion(version:String) {
-            description("unknown spec version")
-            display("The running server supplied an unknown version: {}", version)
-        }
+    #[fail(display="")]
+    Parse(num::ParseIntError),
+
+    #[fail(display="The running server supplied an unknown version: {}", _0 )]
+    SpecVersion(String),
+
+    #[fail(display="ParseError: {}", error)]
+    ParseError{ #[cause] error: ::std::num::ParseIntError },
+
+}
+
+impl From<num::ParseIntError> for Error {
+    fn from(e: num::ParseIntError) -> Error {
+        Error::Parse(e)
     }
 }

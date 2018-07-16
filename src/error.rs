@@ -24,6 +24,12 @@ pub enum Error {
 
 }
 
+impl From<dbus::Error> for Error {
+    fn from(e: dbus::Error) -> Error {
+        Error::Parse(e)
+    }
+}
+
 impl From<num::ParseIntError> for Error {
     fn from(e: num::ParseIntError) -> Error {
         Error::Parse(e)

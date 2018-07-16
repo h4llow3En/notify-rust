@@ -487,7 +487,7 @@ impl Notification {
     /// Returns a handle to a notification
     #[cfg(all(unix, not(target_os = "macos")))]
     pub fn show(&self) -> Result<NotificationHandle> {
-        let connection = Connection::get_private(BusType::Session)?;
+        let connection = Connection::get_private(BusType::Session).map_err(Into::into)?;
         let inner_id = self.id.unwrap_or(0);
         let id = self._show(inner_id, &connection)?;
         Ok(NotificationHandle::new(id, connection, self.clone()))

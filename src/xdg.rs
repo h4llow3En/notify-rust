@@ -7,6 +7,12 @@ use super::Notification;
 use dbus::{BusType, Connection, ConnectionItem, Message, MessageItem};
 use error::*;
 
+#[cfg(not(feature = "debug_namespace"))] pub static NOTIFICATION_NAMESPACE: &str = "org.freedesktop.Notifications";
+#[cfg(not(feature = "debug_namespace"))] pub static NOTIFICATION_OBJECTPATH: &str = "/org/freedesktop/Notifications";
+
+#[cfg(feature = "debug_namespace")] pub static NOTIFICATION_NAMESPACE: &str = "de.hoodie.Notifications";
+#[cfg(feature = "debug_namespace")] pub static NOTIFICATION_OBJECTPATH: &str = "/de/hoodie/Notifications";
+
 /// A handle to a shown notification.
 ///
 /// This keeps a connection alive to ensure actions work on certain desktops.
@@ -16,8 +22,6 @@ pub struct NotificationHandle {
     connection:   Connection,
     notification: Notification
 }
-
-
 
 impl NotificationHandle {
     pub(crate) fn new(id: u32, connection: Connection, notification: Notification) -> NotificationHandle {
@@ -229,9 +233,9 @@ fn wait_for_action_signal<F>(connection: &Connection, id: u32, func: F)
 }
 
 pub fn build_message(method_name: &str) -> Message {
-    Message::new_method_call("org.freedesktop.Notifications",
-                             "/org/freedesktop/Notifications",
-                             "org.freedesktop.Notifications",
+    Message::new_method_call(NOTIFICATION_NAMESPACE,
+                             NOTIFICATION_OBJECTPATH,
+                             NOTIFICATION_NAMESPACE,
                              method_name)
         .unwrap_or_else(|_| panic!("Error building message call {:?}.", method_name))
 }

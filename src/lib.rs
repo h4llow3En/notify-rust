@@ -157,6 +157,8 @@ extern crate dbus;
 
 #[cfg(all(unix, not(target_os = "macos")))] use dbus::{Connection, BusType, MessageItem, MessageItemArray};
 #[cfg(all(unix, not(target_os = "macos")))] mod util;
+#[cfg(all(unix, not(target_os = "macos")))] mod generated;
+#[cfg(all(unix, not(target_os = "macos")))] pub mod server;
 // #[cfg(all(unix, not(target_os = "macos")))] pub mod server;
 
 #[cfg(target_os = "macos")] mod macos;
@@ -551,6 +553,12 @@ pub enum Timeout {
     Never,
     /// Expire after n milliseconds.
     Milliseconds(u32)
+}
+
+impl Default for Timeout {
+    fn default() -> Self {
+        Timeout::Default
+    }
 }
 
 impl From<i32> for Timeout {

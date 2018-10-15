@@ -17,6 +17,7 @@ use dbus::{arg, BusType, Connection, NameFlag, Path};
 use super::{Notification, NotificationHint, Timeout};
 use util::*;
 use xdg::{NOTIFICATION_NAMESPACE, NOTIFICATION_OBJECTPATH};
+use hints::hints_from_variants;
 
 static DBUS_ERROR_FAILED: &str = "org.freedesktop.DBus.Error.Failed";
 /// Version of the crate equals the version server.
@@ -50,9 +51,8 @@ impl NotificationServer {
     // fn handle_notification
 
     /// Start listening for incoming notifications
-    pub fn start<F>(&mut self, closure: F)
-    where
-        F: Fn(&Notification),
+    pub fn start<F: 'static>(&mut self, closure: F)
+        where F: Fn(&Notification),
     {
         let connection = Connection::get_private(BusType::Session).unwrap();
 
@@ -66,7 +66,7 @@ impl NotificationServer {
                 .introspectable()
                 .add(factory
                     .interface(NOTIFICATION_NAMESPACE, ())
-                    .add_m(method_notify(&factory))
+                    .add_m(method_notify(&factory, Box::new(closure) ))
                     .add_m(method_close_notification(&factory))
                     // .add_m(stop_server(&factory))
                     // .add_signal(method_notification_closed(&factory))
@@ -88,8 +88,10 @@ impl NotificationServer {
     }
 }
 
-fn method_notify(factory: &Factory<MTFn>) -> tree::Method<MTFn<()>, ()> {
-    factory.method("Notify", (), |minfo| {
+fn method_notify<F: 'static>(factory: &Factory<MTFn>, notification_receiver: Box<F>) -> tree::Method<MTFn<()>, ()>
+        where F: Fn(&Notification),
+{
+    factory.method("Notify", (), move |minfo| {
         let mut i = minfo.msg.iter_init();
         let appname: String = i.read()?;
         let replaces_id: u32 = i.read()?;
@@ -99,10 +101,8 @@ fn method_notify(factory: &Factory<MTFn>) -> tree::Method<MTFn<()>, ()> {
         let actions: Vec<String> = i.read()?;
         let hints: ::std::collections::HashMap<String, arg::Variant<Box<arg::RefArg>>> = i.read()?;
         let timeout: i32 = i.read()?;
-        println!(
-            "{:?} {:?} {:?} {:?} {:?} {:?} {:?} {:?} ",
-            appname, replaces_id, icon, summary, body, actions, hints, timeout
-        );
+        println!("hints {:?} ", hints);
+
         // let arg0 = try!(d.notify(app_name, replaces_id, app_icon, summary, body, actions, hints, timeout));
         let notification = Notification{
             appname,
@@ -110,12 +110,14 @@ fn method_notify(factory: &Factory<MTFn>) -> tree::Method<MTFn<()>, ()> {
             summary,
             body,
             actions,
-            hints: Default::default(),
+            hints: hints_from_variants(hints),
             timeout: Timeout::from(timeout),
             id: if replaces_id == 0 { None } else { Some(replaces_id) },
             subtitle: None,
         };
-        println!("{:#?}", notification);
+
+        notification_receiver(&notification);
+
         let arg0 = 43;
         let rm = minfo.msg.method_return();
         let rm = rm.append1(arg0);

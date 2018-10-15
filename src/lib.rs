@@ -157,7 +157,6 @@ extern crate dbus;
 
 #[cfg(all(unix, not(target_os = "macos")))] use dbus::{Connection, BusType, MessageItem, MessageItemArray};
 #[cfg(all(unix, not(target_os = "macos")))] mod util;
-#[cfg(all(unix, not(target_os = "macos")))] mod generated;
 #[cfg(all(unix, not(target_os = "macos")))] pub mod server;
 // #[cfg(all(unix, not(target_os = "macos")))] pub mod server;
 
@@ -651,6 +650,15 @@ impl<'a> From<&'a str> for NotificationUrgency {
     }
 }
 
+impl From<Option<u64>> for NotificationUrgency {
+    fn from(maybe_int: Option<u64>) -> NotificationUrgency {
+        match maybe_int {
+            Some(0) => NotificationUrgency::Low,
+            Some(2) => NotificationUrgency::Critical,
+            _ => NotificationUrgency::Normal
+        }
+    }
+}
 
 
 

@@ -12,8 +12,8 @@
 
 use super::NotificationUrgency;
 
-#[cfg(all(unix, not(target_os = "macos")))]
-use dbus::MessageItem;
+#[cfg(all(unix, not(target_os = "macos")))] use std::collections::{HashMap, HashSet};
+#[cfg(all(unix, not(target_os = "macos")))] use dbus::{MessageItem, arg, arg::RefArg};
 
 #[cfg(all(feature = "images", unix, not(target_os = "macos")))]
 use dbus::MessageItemArray;
@@ -322,6 +322,45 @@ impl<'a> From<&'a MessageItem> for NotificationHint {
             }
         }
     }
+}
+
+#[cfg(all(unix, not(target_os = "macos")))]
+impl<'a, A:RefArg> From<(&'a String, &'a A)> for NotificationHint {
+    fn from(pair: (&String, &A)) -> Self {
+
+        let (key, variant) = pair;
+        match (key.as_ref(), variant.as_u64(), variant.as_i64(), variant.as_str().map(String::from)) {
+
+            (ACTION_ICONS,   Some(1),  _,       _          ) => NotificationHint::ActionIcons(true),
+            (ACTION_ICONS,   _,        _,       _          ) => NotificationHint::ActionIcons(false),
+            (URGENCY,        level,    _,       _          ) => NotificationHint::Urgency(level.into()),
+            (CATEGORY,       _,        _,       Some(name) ) => NotificationHint::Category(name),
+
+            (DESKTOP_ENTRY,  _,        _,       Some(entry)) => NotificationHint::DesktopEntry(entry),
+            (IMAGE_PATH,     _,        _,       Some(path) ) => NotificationHint::ImagePath(path),
+            (RESIDENT,       Some(1),  _,       _          ) => NotificationHint::Resident(true),
+            (RESIDENT,       _,        _,       _          ) => NotificationHint::Resident(false),
+
+            (SOUND_FILE,     _,        _,       Some(path) ) => NotificationHint::SoundFile(path),
+            (SOUND_NAME,     _,        _,       Some(name) ) => NotificationHint::SoundName(name),
+            (SUPPRESS_SOUND, Some(1),  _,       _          ) => NotificationHint::SuppressSound(true),
+            (SUPPRESS_SOUND, _,        _,       _          ) => NotificationHint::SuppressSound(false),
+            (TRANSIENT,      Some(1),  _,       _          ) => NotificationHint::Transient(true),
+            (TRANSIENT,      _,        _,       _          ) => NotificationHint::Transient(false),
+            (X,              _,        Some(x), _          ) => NotificationHint::X(x as i32),
+            (Y,              _,        Some(y), _          ) => NotificationHint::Y(y as i32),
+
+            other => {
+                eprintln!("Invalid NotificationHint {:#?} ", other);
+                NotificationHint::Invalid
+            }
+        }
+    }
+}
+
+#[allow(missing_docs)]
+pub fn hints_from_variants<A: RefArg>(hints: HashMap<String, A>) -> HashSet<NotificationHint> {
+    hints.iter().map(Into::into).collect()
 }
 
 #[cfg(all(test, unix, not(target_os = "macos")))]

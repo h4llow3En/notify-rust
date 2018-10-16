@@ -25,9 +25,7 @@ pub struct NotificationHandle {
 
 impl NotificationHandle {
     pub(crate) fn new(id: u32, connection: Connection, notification: Notification) -> NotificationHandle {
-        NotificationHandle { id,
-                             connection,
-                             notification }
+        NotificationHandle { id, connection, notification }
     }
 
     /// Waits for the user to act on a notification and then calls
@@ -172,7 +170,8 @@ pub struct ServerInformation {
 pub fn stop_server() {
     let message = build_message("Stop");
     let connection = Connection::get_private(BusType::Session).unwrap();
-    let _reply = connection.send_with_reply_and_block(message, 2000).unwrap();
+    std::thread::sleep_ms(200);
+    connection.send(message).unwrap();
 }
 
 

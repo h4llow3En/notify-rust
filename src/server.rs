@@ -6,12 +6,14 @@
 //! This server will not replace an already running notification server.
 //!
 
+
 #![allow(unused_imports, unused_variables, dead_code)]
 
 use std::cell::Cell;
 use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
 
-use dbus::tree::{self, Factory, Interface, MTFn, Tree};
+use dbus::tree::{self, Factory, Interface, MTFn, MTSync, Tree};
 use dbus::{arg, BusType, Connection, NameFlag, Path};
 
 use super::{Notification, NotificationHint, Timeout};
@@ -28,19 +30,36 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Debug, Default)]
 pub struct NotificationServer {
     /// Counter for generating notification ids
-    pub counter: Cell<u32>,
+    pub counter: Mutex<Cell<u32>>,
+
     /// A flag that stops the server
-    pub stop: Cell<bool>,
+    pub stopped: Mutex<Cell<bool>>,
 }
 
 impl NotificationServer {
     fn count_up(&self) {
-        self.counter.set(self.counter.get() + 1);
+        if let Ok(counter) = self.counter.lock() {
+            counter.set(counter.get() + 1);
+        }
+    }
+
+    fn stop(&self) {
+        if let Ok(stop) = self.stopped.lock() {
+            stop.set(true);
+        }
+    }
+
+    fn is_stopped(&self) -> bool{
+        if let Ok(stop) = self.stopped.lock() {
+            stop.get()
+        } else {
+            true
+        }
     }
 
     /// Create a new `NotificationServer` instance.
-    pub fn new() -> NotificationServer {
-        NotificationServer::default()
+    pub fn new() -> Arc<NotificationServer> {
+        Arc::new(NotificationServer::default())
     }
 
     // pub fn notify_mothod<F>(&mut self, closure: F)
@@ -51,7 +70,7 @@ impl NotificationServer {
     // fn handle_notification
 
     /// Start listening for incoming notifications
-    pub fn start<F: 'static>(&mut self, closure: F)
+    pub fn start<F: 'static>(self: &Arc<Self>, closure: F)
         where F: Fn(&Notification),
     {
         let connection = Connection::get_private(BusType::Session).unwrap();
@@ -59,6 +78,8 @@ impl NotificationServer {
         connection.release_name(NOTIFICATION_NAMESPACE).unwrap();
         connection.register_name(NOTIFICATION_NAMESPACE, NameFlag::ReplaceExisting as u32).unwrap();
         connection.register_object_path(NOTIFICATION_OBJECTPATH).unwrap();
+
+        let mytex = Arc::new(Mutex::new(self.clone()));
 
         let factory = Factory::new_fn::<()>(); // D::Tree = ()
         let tree = factory.tree(()).add(
@@ -68,7 +89,7 @@ impl NotificationServer {
                     .interface(NOTIFICATION_NAMESPACE, ())
                     .add_m(method_notify(&factory, Box::new(closure) ))
                     .add_m(method_close_notification(&factory))
-                    // .add_m(stop_server(&factory))
+                    .add_m(Self::stop_server(mytex.clone(), &factory))
                     // .add_signal(method_notification_closed(&factory))
                     // .add_signal(method_action_invoked(&factory))
                     .add_m(method_get_capabilities(&factory))
@@ -78,7 +99,7 @@ impl NotificationServer {
 
         connection.add_handler(tree);
 
-        loop {
+        while (!self.is_stopped()) {
             // Wait for incoming messages. This will block up to one second.
             // Discard the result - relevant messages have already been handled.
             if let Some(received) = connection.incoming(1000).next() {
@@ -86,9 +107,23 @@ impl NotificationServer {
             }
         }
     }
+
+    fn stop_server(me: Arc<Mutex<Arc<Self>>>, factory: &Factory<MTFn>) -> tree::Method<MTFn<()>, ()> {
+        factory.method("Stop", (), move |minfo| {
+            if let Ok(me) = me.lock() {
+                me.stop();
+                println!("STOPPING");
+                Ok(vec![])
+            } else {
+                Err(tree::MethodErr::failed(&String::from("nope!")))
+            }
+        })
+        .out_arg(("", "u"))
+    }
+
 }
 
-fn method_notify<F: 'static>(factory: &Factory<MTFn>, notification_receiver: Box<F>) -> tree::Method<MTFn<()>, ()>
+fn method_notify<F: 'static>(factory: &Factory<MTFn>, on_notification: Box<F>) -> tree::Method<MTFn<()>, ()>
         where F: Fn(&Notification),
 {
     factory.method("Notify", (), move |minfo| {
@@ -116,7 +151,7 @@ fn method_notify<F: 'static>(factory: &Factory<MTFn>, notification_receiver: Box
             subtitle: None,
         };
 
-        notification_receiver(&notification);
+        on_notification(&notification);
 
         let arg0 = 43;
         let rm = minfo.msg.method_return();

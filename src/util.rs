@@ -24,12 +24,3 @@ pub fn unwrap_message_str(item: &MessageItem) -> String {
         _ => "".to_owned()
     }
 }
-
-/// TODO: test me
-pub fn unwrap_message_string(item: Option<&MessageItem>) -> String {
-    match item {
-        Some(&MessageItem::Str(ref value)) => value.clone(),
-        Some(&MessageItem::Array(ref items)) => format!("{:?}", items),
-        _ => "".to_owned()
-    }
-}

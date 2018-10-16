@@ -140,10 +140,11 @@
         trivial_casts,
         trivial_numeric_casts,
         unsafe_code,
-        unstable_features,
+        // unstable_features,
         unused_import_braces,
         unused_qualifications)]
 #![warn(missing_docs)]
+#![feature(arbitrary_self_types)]
 
 #[cfg(all(unix, not(target_os = "macos")))]
 extern crate dbus;

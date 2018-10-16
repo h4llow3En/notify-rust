@@ -54,7 +54,7 @@ fn closing()
         .body("you don't see me!")
         .show()
         .unwrap()
-        .NotificationTreeNode();
+        .close();
 }
 
 #[test]

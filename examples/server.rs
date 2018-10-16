@@ -13,7 +13,7 @@ fn main() {
 
 #[cfg(all(unix, not(target_os = "macos")))]
 fn main() {
-    let mut server = NotificationServer::new();
+    let server = NotificationServer::new();
     thread::spawn(move || server.start(|notification| println!("{:#?}", notification)));
 
     // std::thread::sleep(Duration::from_millis(500));
